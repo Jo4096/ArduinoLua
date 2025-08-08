@@ -1,16 +1,7 @@
 #ifndef ARDUINOLUA_HPP
 #define ARDUINOLUA_HPP
 
-
-
-extern "C"
-{
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-}
-
-
+#include "lua.hpp"
 #include "Arduino.h" // Inclui o cabeçalho do Arduino para as funções de GPIO
 #include "Wire.h"
 #include "SPI.h"

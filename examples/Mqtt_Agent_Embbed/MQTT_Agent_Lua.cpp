@@ -1,24 +1,77 @@
 #include "MQTT_Agent_Lua.hpp"
-#include <map>
 
-#define LUA_MQTT_AGENT_METATABLE "CJJ.MQTT_Agent"
+struct LuaCallbackInfo {
+    lua_State* L = nullptr;
+    int ref = LUA_NOREF;
+};
 
-// Guarda referências das funções de comandos Lua
-static std::map<String, int> luaCommandHandlers; // command -> Lua ref
-static int luaOnMessageCallbackRef = LUA_NOREF; // referência do callback onMessage (se usado)
+static LuaCallbackInfo onMessageCallbackInfo;
+static std::map<std::string, LuaCallbackInfo> commandCallbacks;
 
-int lua_MQTT_Agent_gc(lua_State *L)
+void jsonToLuaTable(lua_State* L, JsonDocument& doc) 
 {
-    auto **userdata = (MQTT_Agent **)luaL_checkudata(L, 1, LUA_MQTT_AGENT_METATABLE);
-    if (*userdata) {
-        delete *userdata;
-        *userdata = nullptr;
+    lua_newtable(L);
+    int tableIndex = lua_gettop(L);
+
+    if (doc.is<JsonObject>()) {
+        for (JsonPair p : doc.as<JsonObject>()) {
+            const char* key = p.key().c_str();
+            JsonVariant value = p.value();
+
+            lua_pushstring(L, key);
+
+            if (value.is<int>()) {
+                lua_pushinteger(L, value.as<int>());
+            } else if (value.is<float>()) {
+                lua_pushnumber(L, value.as<float>());
+            } else if (value.is<bool>()) {
+                lua_pushboolean(L, value.as<bool>());
+            } else if (value.is<const char*>()) {
+                lua_pushstring(L, value.as<const char*>());
+            } else if (value.is<JsonObject>()) {
+                JsonDocument nestedDoc;
+                deserializeJson(nestedDoc, value.as<String>());
+                jsonToLuaTable(L, nestedDoc);
+            } else if (value.is<JsonArray>()) {
+                JsonDocument nestedDoc;
+                deserializeJson(nestedDoc, value.as<String>());
+                jsonToLuaTable(L, nestedDoc);
+            } else {
+                lua_pushnil(L);
+            }
+            lua_settable(L, tableIndex);
+        }
+    } else if (doc.is<JsonArray>()) {
+        int i = 1;
+        for (JsonVariant element : doc.as<JsonArray>()) {
+            lua_pushinteger(L, i++);
+
+            if (element.is<int>()) {
+                lua_pushinteger(L, element.as<int>());
+            } else if (element.is<float>()) {
+                lua_pushnumber(L, element.as<float>());
+            } else if (element.is<bool>()) {
+                lua_pushboolean(L, element.as<bool>());
+            } else if (element.is<const char*>()) {
+                lua_pushstring(L, element.as<const char*>());
+            } else if (element.is<JsonObject>()) {
+                JsonDocument nestedDoc;
+                deserializeJson(nestedDoc, element.as<String>());
+                jsonToLuaTable(L, nestedDoc);
+            } else if (element.is<JsonArray>()) {
+                JsonDocument nestedDoc;
+                deserializeJson(nestedDoc, element.as<String>());
+                jsonToLuaTable(L, nestedDoc);
+            } else {
+                lua_pushnil(L);
+            }
+            lua_settable(L, tableIndex);
+        }
     }
-    return 0;
 }
 
-int lua_MQTT_Agent_new(lua_State *L)
-{
+
+static int l_mqtt_config(lua_State *L) {
     const char *ssid = luaL_checkstring(L, 1);
     const char *password = luaL_checkstring(L, 2);
     const char *mqttServer = luaL_checkstring(L, 3);
@@ -26,157 +79,179 @@ int lua_MQTT_Agent_new(lua_State *L)
     const char *mqttPassword = luaL_checkstring(L, 5);
     const char *deviceId = luaL_checkstring(L, 6);
     int port = luaL_optinteger(L, 7, 1883);
-    int pingPeriod = luaL_optinteger(L, 8, 10000);
+    int pingPeriod = luaL_optinteger(L, 8, 30000);
 
-    auto **userdata = (MQTT_Agent **)lua_newuserdata(L, sizeof(MQTT_Agent *));
-    *userdata = new MQTT_Agent(ssid, password, mqttServer, mqttUsername, mqttPassword, deviceId, port, pingPeriod);
+    Agent.config(ssid, password, mqttServer, mqttUsername, mqttPassword, deviceId, port, pingPeriod);
+    return 0;
+}
 
-    luaL_getmetatable(L, LUA_MQTT_AGENT_METATABLE);
-    lua_setmetatable(L, -2);
-
+static int l_mqtt_begin(lua_State *L) {
+    bool enable = luaL_opt(L, lua_toboolean, 1, true);
+    bool correct = Agent.begin(enable);
+    lua_pushboolean(L, correct);
     return 1;
 }
 
-int lua_MQTT_Agent_begin(lua_State *L)
-{
-    auto **userdata = (MQTT_Agent **)luaL_checkudata(L, 1, LUA_MQTT_AGENT_METATABLE);
-    bool enablePing = lua_toboolean(L, 2);
-    (*userdata)->begin(enablePing);
+static int l_mqtt_loop(lua_State *L) {
+    Agent.loop();
     return 0;
 }
 
-int lua_MQTT_Agent_publish(lua_State *L)
-{
-    auto **userdata = (MQTT_Agent **)luaL_checkudata(L, 1, LUA_MQTT_AGENT_METATABLE);
-    const char *topic = luaL_checkstring(L, 2);
-    const char *message = luaL_checkstring(L, 3);
-    (*userdata)->publish(topic, message);
+static int l_mqtt_stop(lua_State *L) {
+    Agent.stop();
     return 0;
 }
 
-int lua_MQTT_Agent_loop(lua_State *L)
-{
-    auto **userdata = (MQTT_Agent **)luaL_checkudata(L, 1, LUA_MQTT_AGENT_METATABLE);
-    (*userdata)->loop();
+static int l_mqtt_addSubscriptionTopic(lua_State *L) {
+    String topic = luaL_checkstring(L, 1);
+    Agent.addSubscriptionTopic(topic);
     return 0;
 }
 
-int lua_MQTT_Agent_addSubscriptionTopic(lua_State *L)
-{
-    auto **userdata = (MQTT_Agent **)luaL_checkudata(L, 1, LUA_MQTT_AGENT_METATABLE);
-    const char *topic = luaL_checkstring(L, 2);
-    (*userdata)->addSubscriptionTopic(String(topic));
+static int l_mqtt_publish(lua_State *L) {
+    String topic = luaL_checkstring(L, 1);
+    String message = luaL_checkstring(L, 2);
+    Agent.publish(topic, message);
     return 0;
 }
 
-int lua_MQTT_Agent_publishToDeviceFormatted(lua_State *L)
-{
-    auto **userdata = (MQTT_Agent **)luaL_checkudata(L, 1, LUA_MQTT_AGENT_METATABLE);
-    const char *devId = luaL_checkstring(L, 2);
-    const char *command = luaL_checkstring(L, 3);
-    const char *message = luaL_checkstring(L, 4);
-    (*userdata)->publishToDeviceFormatted(String(devId), String(command), String(message));
+static int l_mqtt_publishToDevice(lua_State *L) {
+    String devId = luaL_checkstring(L, 1);
+    String message = luaL_checkstring(L, 2);
+    Agent.publishToDevice(devId, message);
     return 0;
 }
 
-int lua_MQTT_Agent_registerCommand(lua_State *L)
+static int l_mqtt_publishToDeviceFormatted(lua_State *L) {
+    String devId = luaL_checkstring(L, 1);
+    String command = luaL_checkstring(L, 2);
+    String message = luaL_checkstring(L, 3);
+    Agent.publishToDeviceFormatted(devId, command, message);
+    return 0;
+}
+
+static int l_mqtt_setOnMessageCallback(lua_State *L) 
 {
-    auto **userdata = (MQTT_Agent **)luaL_checkudata(L, 1, LUA_MQTT_AGENT_METATABLE);
-    const char *commandName = luaL_checkstring(L, 2);
-    luaL_checktype(L, 3, LUA_TFUNCTION);
+    luaL_checktype(L, 1, LUA_TFUNCTION);
+    
+    if (onMessageCallbackInfo.ref != LUA_NOREF) {
+        luaL_unref(onMessageCallbackInfo.L, LUA_REGISTRYINDEX, onMessageCallbackInfo.ref);
+    }
+    
+    onMessageCallbackInfo.L = L;
+    onMessageCallbackInfo.ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    int lua_func_ref = onMessageCallbackInfo.ref; // **Aqui!**
+    lua_State* callback_L = L;
 
-    // Guardar função como referência no LUA_REGISTRYINDEX
-    lua_pushvalue(L, 3); // copiar a função
-    int ref = luaL_ref(L, LUA_REGISTRYINDEX);
-    luaCommandHandlers[String(commandName)] = ref;
-
-    // Registar command handler no C++, captura lua_State* por valor
-    (*userdata)->registerCommand(commandName, [L, ref](String from, String topic, JsonDocument &doc) {
-        auto it = luaCommandHandlers.find(doc["command"] | "");
-        if (it == luaCommandHandlers.end()) return;
-
-        // Recuperar função Lua pelo ref guardado
-        lua_rawgeti(L, LUA_REGISTRYINDEX, ref);
-
-        lua_pushstring(L, from.c_str());
-        lua_pushstring(L, topic.c_str());
-
-        String docStr;
-        serializeJson(doc, docStr);
-        lua_pushstring(L, docStr.c_str());
-
-        if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
-            Serial.print("[LUA ERROR] ");
-            Serial.println(lua_tostring(L, -1));
-            lua_pop(L, 1);
+    // Use a variável lua_func_ref na captura
+    std::function<void(String, String, String)> cpp_callback = [callback_L, lua_func_ref](String topic, String payload, String from) {
+        lua_rawgeti(callback_L, LUA_REGISTRYINDEX, lua_func_ref);
+        lua_pushstring(callback_L, topic.c_str());
+        lua_pushstring(callback_L, payload.c_str());
+        lua_pushstring(callback_L, from.c_str());
+        if (lua_pcall(callback_L, 3, 0, 0) != LUA_OK) {
+            const char *error_msg = lua_tostring(callback_L, -1);
+            lua_pop(callback_L, 1);
         }
-    });
-
+    };
+    Agent.setOnMessageCallback(cpp_callback);
     return 0;
 }
 
-// --- NOVA FUNÇÃO ---
-// Binding para setOnMessageCallback
-int lua_MQTT_Agent_setOnMessageCallback(lua_State *L)
-{
-    auto **userdata = (MQTT_Agent **)luaL_checkudata(L, 1, LUA_MQTT_AGENT_METATABLE);
+static int l_mqtt_registerCommand(lua_State *L) {
+    const char *name_c_str = luaL_checkstring(L, 1);
+    std::string name(name_c_str);
     luaL_checktype(L, 2, LUA_TFUNCTION);
 
-    // Se já existia uma callback anterior, limpa referência
-    if (luaOnMessageCallbackRef != LUA_NOREF) {
-        luaL_unref(L, LUA_REGISTRYINDEX, luaOnMessageCallbackRef);
-        luaOnMessageCallbackRef = LUA_NOREF;
+    if (commandCallbacks.count(name)) {
+        luaL_unref(commandCallbacks[name].L, LUA_REGISTRYINDEX, commandCallbacks[name].ref);
     }
 
-    lua_pushvalue(L, 2);
-    luaOnMessageCallbackRef = luaL_ref(L, LUA_REGISTRYINDEX);
+    int lua_func_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    commandCallbacks[name] = {L, lua_func_ref};
 
-    // Registra callback no agente
-    (*userdata)->setOnMessageCallback([L](String from, String topic, String payload) {
-        lua_rawgeti(L, LUA_REGISTRYINDEX, luaOnMessageCallbackRef);
-
-        lua_pushstring(L, from.c_str());
-        lua_pushstring(L, topic.c_str());
-        lua_pushstring(L, payload.c_str());
-
-        if (lua_pcall(L, 3, 0, 0) != LUA_OK) {
-            Serial.print("[LUA CALLBACK ERROR] ");
-            Serial.println(lua_tostring(L, -1));
-            lua_pop(L, 1);
+    lua_State* callback_L = L;
+    std::function<void(String, String, JsonDocument &)> cpp_callback =
+        [callback_L, lua_func_ref](String from, String topic, JsonDocument &doc) {
+        lua_rawgeti(callback_L, LUA_REGISTRYINDEX, lua_func_ref);
+        lua_pushstring(callback_L, from.c_str());
+        lua_pushstring(callback_L, topic.c_str());
+        jsonToLuaTable(callback_L, doc);
+        if (lua_pcall(callback_L, 3, 0, 0) != LUA_OK) {
+            const char *error_msg = lua_tostring(callback_L, -1);
+            lua_pop(callback_L, 1);
         }
-    });
-
+    };
+    Agent.registerCommand(String(name_c_str), cpp_callback);
     return 0;
 }
 
-static const luaL_Reg MQTT_Agent_methods[] = {
-    {"begin", lua_MQTT_Agent_begin},
-    {"publish", lua_MQTT_Agent_publish},
-    {"loop", lua_MQTT_Agent_loop},
-    {"addSubscriptionTopic", lua_MQTT_Agent_addSubscriptionTopic},
-    {"publishToDeviceFormatted", lua_MQTT_Agent_publishToDeviceFormatted},
-    {"registerCommand", lua_MQTT_Agent_registerCommand},
-    {"setOnMessageCallback", lua_MQTT_Agent_setOnMessageCallback}, // <<<<< registado aqui
-    {NULL, NULL}
-};
+static int l_mqtt_removeCommand(lua_State *L) {
+    const char *name_c_str = luaL_checkstring(L, 1);
+    std::string name(name_c_str);
 
-static const luaL_Reg MQTT_Agent_functions[] = {
-    {"new", lua_MQTT_Agent_new},
-    {NULL, NULL}
-};
+    if (commandCallbacks.count(name)) {
+        luaL_unref(commandCallbacks[name].L, LUA_REGISTRYINDEX, commandCallbacks[name].ref);
+        commandCallbacks.erase(name);
+    }
+    Agent.removeCommand(String(name_c_str));
+    return 0;
+}
 
-extern "C" int luaopen_MQTT_Agent(lua_State *L)
+
+static int l_mqtt_getDeviceId(lua_State *L)
 {
-    luaL_newmetatable(L, LUA_MQTT_AGENT_METATABLE);
+    lua_pushstring(L, Agent.getDeviceId());
+    return 1;
+}
 
-    lua_pushvalue(L, -1);
-    lua_setfield(L, -2, "__index");
-
-    lua_pushcfunction(L, lua_MQTT_Agent_gc);
-    lua_setfield(L, -2, "__gc");
-    luaL_setfuncs(L, MQTT_Agent_methods, 0);
-
+static int l_mqtt_getCommands(lua_State *L)
+{
     lua_newtable(L);
-    luaL_setfuncs(L, MQTT_Agent_functions, 0);
+    int i = 1;
+    for (const String& dev : Agent.getCommands()) {
+        lua_pushinteger(L, i++);
+        lua_pushstring(L, dev.c_str());
+        lua_settable(L, -3);
+    }
+    return 1;
+}
+
+
+static int l_mqtt_getKnownDevices(lua_State *L)
+{
+    lua_newtable(L);
+    int i = 1;
+    for (const String& dev : Agent.getKnownDevices()) {
+        lua_pushinteger(L, i++);
+        lua_pushstring(L, dev.c_str());
+        lua_settable(L, -3);
+    }
+    return 1;
+}
+
+
+static const luaL_Reg mqtt_lib[] = {
+    {"config", l_mqtt_config},
+    {"begin", l_mqtt_begin},
+    {"loop", l_mqtt_loop},
+    {"stop", l_mqtt_stop},
+    {"addSubscriptionTopic", l_mqtt_addSubscriptionTopic},
+    {"publish", l_mqtt_publish},
+    {"publishToDevice", l_mqtt_publishToDevice},
+    {"publishToDeviceFormatted", l_mqtt_publishToDeviceFormatted},
+    {"setOnMessageCallback", l_mqtt_setOnMessageCallback},
+    {"registerCommand", l_mqtt_registerCommand},
+    {"removeCommand", l_mqtt_removeCommand},
+    {"getDeviceId", l_mqtt_getDeviceId},
+    {"getCommands", l_mqtt_getCommands},
+    {"getKnownDevices", l_mqtt_getKnownDevices},
+    {NULL, NULL}
+};
+
+// Função de inicialização da biblioteca Lua
+extern "C" int luaopen_MQTT_Agent(lua_State *L) 
+{
+    luaL_newlib(L, mqtt_lib);
     return 1;
 }

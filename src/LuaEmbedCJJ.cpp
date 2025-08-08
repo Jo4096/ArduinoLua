@@ -166,3 +166,34 @@ void LuaEmbed::reportError()
     Serial.printf("Lua Error: %s\n", msg);
     lua_pop(L, 1);
 }
+
+
+
+void LuaEmbed::commandLine()
+{
+    static String inputLine;
+
+    while (Serial.available())
+    {
+        char c = Serial.read();
+        if (c == '\n' || c == '\r')  // Quando pressiona ENTER
+        {
+            if (inputLine.length() > 0)
+            {
+                Serial.print(">> ");
+                Serial.println(inputLine);
+
+                if (luaL_dostring(L, inputLine.c_str()) != LUA_OK)
+                {
+                    reportError();
+                }
+
+                inputLine = "";
+            }
+        }
+        else
+        {
+            inputLine += c;
+        }
+    }
+}

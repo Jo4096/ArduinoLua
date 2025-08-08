@@ -5,13 +5,7 @@
 #include <vector>
 #include <LittleFS.h>
 #include <utility> // Para std::pair
-
-extern "C"
-{
-#include "lua.h"
-#include "lauxlib.h"
-#include "lualib.h"
-}
+#include "lua.hpp"
 
 using LuaLibInitFunc = int (*)(lua_State *);
 
@@ -42,6 +36,7 @@ public:
     void reportError();
 
     lua_State *getLuaState() { return L; }
+    void commandLine();
 };
 
 #endif
