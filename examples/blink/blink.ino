@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include "LuaEmbedCJJ.hpp"   // Tua classe de embed Lua personalizada
 #include "ArduinoLua.hpp"    // Biblioteca que expõe funções Arduino para Lua
 
 LuaEmbed lua;  // Instância do motor Lua embedado

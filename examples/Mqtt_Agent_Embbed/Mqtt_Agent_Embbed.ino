@@ -1,5 +1,4 @@
 #include <Arduino.h>
-#include "LuaEmbedCJJ.hpp"
 #include "ArduinoLua.hpp"
 #include "MQTT_Agent_Lua.hpp"
 

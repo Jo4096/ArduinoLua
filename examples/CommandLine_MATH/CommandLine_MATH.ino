@@ -1,7 +1,5 @@
 #include <Arduino.h>
-#include "LuaEmbedCJJ.hpp"
 #include "ArduinoLua.hpp"
-#include "Math_lua.hpp"
 
 LuaEmbed lua;
 

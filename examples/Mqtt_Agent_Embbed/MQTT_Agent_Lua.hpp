@@ -4,7 +4,6 @@
 #include "Arduino.h"
 #include "MQTT_Agent.hpp"
 #include "ArduinoLua.hpp"
-#include "lua.hpp"
 
 void jsonToLuaTable(lua_State* L, JsonDocument& doc);
 
