@@ -15,7 +15,7 @@ void setup() {
     String code = R"(
         local ssid = "SSID"
         local password = "PASSWORD"
-        local mqttserver = "IP
+        local mqttserver = "IP"
         local mqttuser = "USERNAME_BROKER"
         local mqttpass = "PASSWORD_BROKER"
         local deviceID = "esp32_quarto"
