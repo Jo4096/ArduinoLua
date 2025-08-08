@@ -16,6 +16,9 @@ private:
     String scriptPath;
     // Armazena pares de nome da biblioteca e a função de inicialização
     std::vector<std::pair<String, LuaLibInitFunc>> libsToLoad;
+    bool beginCalled = false;
+
+    void checkBeginCalled();
 
 public:
     LuaEmbed() = default;

@@ -2,6 +2,15 @@
 
 static bool littleFsMounted = false; // controla montagem LittleFS
 
+void LuaEmbed::checkBeginCalled()
+{
+    if (!beginCalled)
+    {
+        Serial.println("[WARNING]: you forgot to LuaEmbed.begin()/LuaEmbed.begin_from_script()");
+        begin_from_script(""); // da begin mas nao faz nenhum codigo extra
+    }
+}
+
 LuaEmbed::~LuaEmbed()
 {
     if (L)
@@ -18,6 +27,7 @@ void LuaEmbed::addLib(const String &name, LuaLibInitFunc libInit)
 
 bool LuaEmbed::begin(const String &path)
 {
+    beginCalled = true;
     if (!littleFsMounted)
     {
         if (!LittleFS.begin())
@@ -61,6 +71,7 @@ bool LuaEmbed::begin(const String &path)
 
 bool LuaEmbed::begin_from_script(const String &code)
 {
+    beginCalled = true;
     if (!littleFsMounted)
     {
         if (!LittleFS.begin())
@@ -98,6 +109,8 @@ bool LuaEmbed::begin_from_script(const String &code)
 // O resto do código (runScriptFromFile, runScript, loop, reportError) permanece igual
 bool LuaEmbed::runScriptFromFile()
 {
+    checkBeginCalled();
+
     if (!L)
     {
         Serial.println("Lua state not initialized");
@@ -125,6 +138,8 @@ bool LuaEmbed::runScriptFromFile()
 
 bool LuaEmbed::runScript(const String &code)
 {
+    checkBeginCalled();
+
     if (!L)
     {
         Serial.println("Lua state not initialized");
@@ -140,6 +155,8 @@ bool LuaEmbed::runScript(const String &code)
 
 void LuaEmbed::loop()
 {
+    checkBeginCalled();
+
     if (!L)
         return;
 
@@ -159,6 +176,8 @@ void LuaEmbed::loop()
 
 void LuaEmbed::reportError()
 {
+    checkBeginCalled();
+
     if (!L)
         return;
 
@@ -167,16 +186,16 @@ void LuaEmbed::reportError()
     lua_pop(L, 1);
 }
 
-
-
 void LuaEmbed::commandLine()
 {
+    checkBeginCalled();
+
     static String inputLine;
 
     while (Serial.available())
     {
         char c = Serial.read();
-        if (c == '\n' || c == '\r')  // Quando pressiona ENTER
+        if (c == '\n' || c == '\r') // Quando pressiona ENTER
         {
             if (inputLine.length() > 0)
             {

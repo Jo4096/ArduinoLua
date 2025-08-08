@@ -11,7 +11,8 @@ void setup() {
     //se matematica é tão bom porque é que não existe matematica 2?
     lua.addLib("math", luaopen_math2); //math.sqrt(numero) math.atan2(y, x) etc...
     //nvm
-    Serial.println("ArduinoLua Console:\n>>")
+    Serial.println("ArduinoLua Console:\n>>");
+    lua.begin_from_script("");
 }
 
 void loop() {
