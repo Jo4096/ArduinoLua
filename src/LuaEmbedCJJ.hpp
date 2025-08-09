@@ -13,10 +13,13 @@ class LuaEmbed
 {
 private:
     lua_State *L = nullptr;
-    String scriptPath;
-    // Armazena pares de nome da biblioteca e a função de inicialização
-    std::vector<std::pair<String, LuaLibInitFunc>> libsToLoad;
+    String scriptPath; // caminho do script se iniciado por ficheiro
+    String scriptCode; // código do script se iniciado por string
+    bool beginFromScript = false;
     bool beginCalled = false;
+    static bool littleFsMounted;
+
+    std::vector<std::pair<String, LuaLibInitFunc>> libsToLoad;
 
     void checkBeginCalled();
 
@@ -24,12 +27,11 @@ public:
     LuaEmbed() = default;
     ~LuaEmbed();
 
-    // Adicionar biblioteca para carregar com um nome
     void addLib(const String &name, LuaLibInitFunc libInit);
 
-    // Inicializar Lua e carregar as libs adicionadas a partir de um ficheiro
+    // Inicia Lua com script de ficheiro
     bool begin(const String &scriptPath);
-    // Inicializar Lua e carregar as libs adicionadas a partir de uma string
+    // Inicia Lua com script de string
     bool begin_from_script(const String &code);
 
     bool runScriptFromFile();
@@ -37,6 +39,9 @@ public:
 
     void loop();
     void reportError();
+
+    // Reinicia o estado Lua e recarrega tudo
+    void restart();
 
     lua_State *getLuaState() { return L; }
     void commandLine();

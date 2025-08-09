@@ -1,13 +1,13 @@
 #include "LuaEmbedCJJ.hpp"
 
-static bool littleFsMounted = false; // controla montagem LittleFS
+bool LuaEmbed::littleFsMounted = false;
 
 void LuaEmbed::checkBeginCalled()
 {
     if (!beginCalled)
     {
-        Serial.println("[WARNING]: you forgot to LuaEmbed.begin()/LuaEmbed.begin_from_script()");
-        begin_from_script(""); // da begin mas nao faz nenhum codigo extra
+        Serial.println("[WARNING]: you forgot to call LuaEmbed.begin()/LuaEmbed.begin_from_script()");
+        begin_from_script(""); // inicia estado vazio para evitar erros
     }
 }
 
@@ -28,6 +28,10 @@ void LuaEmbed::addLib(const String &name, LuaLibInitFunc libInit)
 bool LuaEmbed::begin(const String &path)
 {
     beginCalled = true;
+    beginFromScript = false;
+    scriptPath = path;
+    scriptCode = "";
+
     if (!littleFsMounted)
     {
         if (!LittleFS.begin())
@@ -37,8 +41,6 @@ bool LuaEmbed::begin(const String &path)
         }
         littleFsMounted = true;
     }
-
-    scriptPath = path;
 
     if (L)
     {
@@ -53,16 +55,11 @@ bool LuaEmbed::begin(const String &path)
         return false;
     }
 
-    luaL_openlibs(L); // abre libs padrão
+    luaL_openlibs(L);
 
-    // Carregar as libs personalizadas
     for (auto &libPair : libsToLoad)
     {
-        // Chama a função de inicialização. Ela coloca a tabela da biblioteca na pilha.
         libPair.second(L);
-
-        // Atribui a tabela no topo da pilha (o retorno da libInit) à variável global com o nome certo.
-        // Isto é o que faltava!
         lua_setglobal(L, libPair.first.c_str());
     }
 
@@ -72,6 +69,10 @@ bool LuaEmbed::begin(const String &path)
 bool LuaEmbed::begin_from_script(const String &code)
 {
     beginCalled = true;
+    beginFromScript = true;
+    scriptCode = code;
+    scriptPath = "";
+
     if (!littleFsMounted)
     {
         if (!LittleFS.begin())
@@ -106,7 +107,6 @@ bool LuaEmbed::begin_from_script(const String &code)
     return runScript(code);
 }
 
-// O resto do código (runScriptFromFile, runScript, loop, reportError) permanece igual
 bool LuaEmbed::runScriptFromFile()
 {
     checkBeginCalled();
@@ -186,6 +186,51 @@ void LuaEmbed::reportError()
     lua_pop(L, 1);
 }
 
+void LuaEmbed::restart()
+{
+    if (L)
+    {
+        lua_close(L);
+        L = nullptr;
+    }
+
+    if (!beginCalled)
+    {
+        Serial.println("[WARNING]: restart called but LuaEmbed.begin() was never called");
+        return;
+    }
+
+    L = luaL_newstate();
+    if (!L)
+    {
+        Serial.println("Failed to recreate Lua state during restart");
+        return;
+    }
+
+    luaL_openlibs(L);
+
+    for (auto &libPair : libsToLoad)
+    {
+        libPair.second(L);
+        lua_setglobal(L, libPair.first.c_str());
+    }
+
+    if (beginFromScript)
+    {
+        if (!runScript(scriptCode))
+        {
+            Serial.println("Failed to rerun script from string during restart");
+        }
+    }
+    else
+    {
+        if (!runScriptFromFile())
+        {
+            Serial.println("Failed to rerun script from file during restart");
+        }
+    }
+}
+
 void LuaEmbed::commandLine()
 {
     checkBeginCalled();
@@ -195,7 +240,7 @@ void LuaEmbed::commandLine()
     while (Serial.available())
     {
         char c = Serial.read();
-        if (c == '\n' || c == '\r') // Quando pressiona ENTER
+        if (c == '\n' || c == '\r') // Enter
         {
             if (inputLine.length() > 0)
             {
