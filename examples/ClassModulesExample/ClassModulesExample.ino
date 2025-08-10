@@ -12,9 +12,9 @@ void setup() {
     delay(10);
   }
 
-  // Adiciona uma biblioteca C++ ao ambiente Lua. A string "MelhorClasseDeSempre"
+  // Adiciona uma biblioteca C++ ao ambiente Lua. A string "SimpleClass"
   // é o nome que a biblioteca terá em Lua. O segundo argumento,
-  // luaopen_MelhorClasseDeSempre, é a função C que regista a
+  // luaopen_SimpleClass, é a função C que regista a
   // classe C++ e os seus métodos para que possam ser chamados a partir de Lua.
   lua.addLib("SimpleClass", luaopen_SimpleClass);
 
