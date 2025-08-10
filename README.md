@@ -47,7 +47,7 @@ Funções e Classes Principais:
 - Arduino Framework (ESP32, ESP8266, ou equivalente com memória suficiente)
 - Suporte a LittleFS (para carregar scripts a partir de ficheiros)
 - IDE Arduino ou PlatformIO
-- Para o exemplo MQTT é necessario as bibliotecas https://github.com/Jo4096/MQTT_Arduino_Agent e opcionalmente para testar caso não haja uma segunda esp https://github.com/Jo4096/MQTT_Arduino_Agent
+- Para o exemplo MQTT é necessario as bibliotecas https://github.com/Jo4096/MQTT_Arduino_Agent e opcionalmente para testar caso não haja uma segunda esp https://github.com/Jo4096/MQTT_Python_Agent
 
 # Modules
 Um module é uma ponte entre C/C++ com Lua. Os modules são simples de se integrar, ver por exemplo **`Arduino_lua.hpp`** e **`Arduino_lua.cpp`**. A presença de classes globais de uso unico como por exemplo Serial, ou Wire simplifica muito a criação desses modules pois no fundo a sua implementação vai ser sempre nos seguintes formatos:
