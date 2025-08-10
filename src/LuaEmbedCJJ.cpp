@@ -248,7 +248,6 @@ void LuaEmbed::commandLine()
     }
 }
 
-
 void LuaEmbed::forceGC()
 {
     if (!L)
