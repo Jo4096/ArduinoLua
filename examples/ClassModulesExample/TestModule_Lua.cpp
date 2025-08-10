@@ -12,6 +12,7 @@ static int l_printar_new(lua_State *L)
     // Cria o objeto C++ no ambiente Lua, já com a metatabela associada
     // para que os métodos possam ser chamados.
     // "SimpleClassMeta" é o nome que a metatabela terá em Lua.
+    // O owner do pointer criado é o Lua, não nós. o LuaHelper::newObjectWithMeta usa um placement new para inicializar esse pointer com os parametros dados
     LuaHelper::newObjectWithMeta<SimpleClass>(L, "SimpleClassMeta");
     return 1; // Retorna um valor (o userdata) na stack do Lua.
 }
@@ -57,8 +58,7 @@ static int l_printar_print_ao_contrario(lua_State *L)
 
 // Função de 'garbage collection' (recolha de lixo) para o objeto C++.
 // É chamada automaticamente pelo Lua quando o objeto não é mais referenciado.
-// A classe tenha um destructor é boa ideia chamar-lo aqui com obj->~()
-// Nota o owner do pointer não somos nos portanto não deletem o pointer, isso é trabalho do gc
+// A classe tenha um destructor é boa ideia chamar-lo aqui com obj->~(), o que é exatamente o que o LuaHelper::gc faz.
 static int l_printar_gc(lua_State *L)
 {
     return LuaHelper::gc<SimpleClass>(L);
