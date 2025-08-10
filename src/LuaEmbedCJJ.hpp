@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <vector>
 #include <LittleFS.h>
-#include <utility> // Para std::pair
+#include <utility> // std::pair
 #include "lua.hpp"
 
 using LuaLibInitFunc = int (*)(lua_State *);
@@ -13,12 +13,12 @@ class LuaEmbed
 {
 private:
     lua_State *L = nullptr;
-    String scriptPath; // caminho do script se iniciado por ficheiro
-    String scriptCode; // código do script se iniciado por string
+    String scriptPath;
+    String scriptCode;
     bool beginFromScript = false;
     bool beginCalled = false;
-    static bool littleFsMounted;
-
+    long lastGcMillis = 0;
+    long gcInterval = 10000;
     std::vector<std::pair<String, LuaLibInitFunc>> libsToLoad;
 
     void checkBeginCalled();
@@ -29,22 +29,21 @@ public:
 
     void addLib(const String &name, LuaLibInitFunc libInit);
 
-    // Inicia Lua com script de ficheiro
-    bool begin(const String &scriptPath);
-    // Inicia Lua com script de string
-    bool begin_from_script(const String &code);
+    bool begin(const String &scriptPath, long gcInterval = 10000);
+    bool begin_from_script(const String &code, long gcInterval = 10000);
 
     bool runScriptFromFile();
-    bool runScript(const String &code);
+    bool runScript(const String &code, bool cleancg = false);
 
     void loop();
     void reportError();
 
-    // Reinicia o estado Lua e recarrega tudo
     void restart();
 
     lua_State *getLuaState() { return L; }
     void commandLine();
+
+    void forceGC();
 };
 
 #endif

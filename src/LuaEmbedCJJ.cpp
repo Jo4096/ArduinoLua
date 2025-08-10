@@ -1,7 +1,5 @@
 #include "LuaEmbedCJJ.hpp"
 
-bool LuaEmbed::littleFsMounted = false;
-
 void LuaEmbed::checkBeginCalled()
 {
     if (!beginCalled)
@@ -15,6 +13,7 @@ LuaEmbed::~LuaEmbed()
 {
     if (L)
     {
+        lua_gc(L, LUA_GCCOLLECT, 0); // coleta lixo Lua antes de fechar
         lua_close(L);
         L = nullptr;
     }
@@ -25,83 +24,56 @@ void LuaEmbed::addLib(const String &name, LuaLibInitFunc libInit)
     libsToLoad.push_back({name, libInit});
 }
 
-bool LuaEmbed::begin(const String &path)
+bool LuaEmbed::begin(const String &path, long gcInterval)
 {
     beginCalled = true;
     beginFromScript = false;
     scriptPath = path;
     scriptCode = "";
-
-    if (!littleFsMounted)
-    {
-        if (!LittleFS.begin())
-        {
-            Serial.println("Failed to mount LittleFS");
-            return false;
-        }
-        littleFsMounted = true;
-    }
-
-    if (L)
-    {
-        lua_close(L);
-        L = nullptr;
-    }
-
-    L = luaL_newstate();
+    lastGcMillis = millis();
+    this->gcInterval = gcInterval;
     if (!L)
     {
-        Serial.println("Failed to create Lua state");
-        return false;
-    }
+        L = luaL_newstate();
+        if (!L)
+        {
+            Serial.println("Failed to create Lua state");
+            return false;
+        }
+        luaL_openlibs(L);
 
-    luaL_openlibs(L);
-
-    for (auto &libPair : libsToLoad)
-    {
-        libPair.second(L);
-        lua_setglobal(L, libPair.first.c_str());
+        for (auto &libPair : libsToLoad)
+        {
+            libPair.second(L);
+            lua_setglobal(L, libPair.first.c_str());
+        }
     }
 
     return runScriptFromFile();
 }
 
-bool LuaEmbed::begin_from_script(const String &code)
+bool LuaEmbed::begin_from_script(const String &code, long gcInterval)
 {
     beginCalled = true;
     beginFromScript = true;
     scriptCode = code;
-    scriptPath = "";
-
-    if (!littleFsMounted)
-    {
-        if (!LittleFS.begin())
-        {
-            Serial.println("Failed to mount LittleFS");
-            return false;
-        }
-        littleFsMounted = true;
-    }
-
-    if (L)
-    {
-        lua_close(L);
-        L = nullptr;
-    }
-
-    L = luaL_newstate();
+    lastGcMillis = millis();
+    this->gcInterval = gcInterval;
     if (!L)
     {
-        Serial.println("Failed to create Lua state");
-        return false;
-    }
+        L = luaL_newstate();
+        if (!L)
+        {
+            Serial.println("Failed to create Lua state");
+            return false;
+        }
+        luaL_openlibs(L);
 
-    luaL_openlibs(L);
-
-    for (auto &libPair : libsToLoad)
-    {
-        libPair.second(L);
-        lua_setglobal(L, libPair.first.c_str());
+        for (auto &libPair : libsToLoad)
+        {
+            libPair.second(L);
+            lua_setglobal(L, libPair.first.c_str());
+        }
     }
 
     return runScript(code);
@@ -136,7 +108,7 @@ bool LuaEmbed::runScriptFromFile()
     return runScript(code);
 }
 
-bool LuaEmbed::runScript(const String &code)
+bool LuaEmbed::runScript(const String &code, bool cleancg)
 {
     checkBeginCalled();
 
@@ -150,6 +122,12 @@ bool LuaEmbed::runScript(const String &code)
         reportError();
         return false;
     }
+
+    if (cleancg)
+    {
+        forceGC();
+    }
+
     return true;
 }
 
@@ -172,6 +150,13 @@ void LuaEmbed::loop()
     {
         lua_pop(L, 1);
     }
+
+    unsigned long now = millis();
+    if (now - lastGcMillis >= gcInterval)
+    {
+        forceGC();
+        lastGcMillis = now;
+    }
 }
 
 void LuaEmbed::reportError()
@@ -190,6 +175,7 @@ void LuaEmbed::restart()
 {
     if (L)
     {
+        lua_gc(L, LUA_GCCOLLECT, 0);
         lua_close(L);
         L = nullptr;
     }
@@ -260,4 +246,13 @@ void LuaEmbed::commandLine()
             inputLine += c;
         }
     }
+}
+
+
+void LuaEmbed::forceGC()
+{
+    if (!L)
+        return;
+
+    lua_gc(L, LUA_GCCOLLECT, 0);
 }
