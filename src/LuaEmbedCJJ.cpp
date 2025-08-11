@@ -171,7 +171,7 @@ void LuaEmbed::reportError()
     lua_pop(L, 1);
 }
 
-void LuaEmbed::restart()
+void LuaEmbed::restart(bool rerun)
 {
     if (L)
     {
@@ -201,18 +201,21 @@ void LuaEmbed::restart()
         lua_setglobal(L, libPair.first.c_str());
     }
 
-    if (beginFromScript)
+    if (rerun)
     {
-        if (!runScript(scriptCode))
+        if (beginFromScript)
         {
-            Serial.println("Failed to rerun script from string during restart");
+            if (!runScript(scriptCode))
+            {
+                Serial.println("Failed to rerun script from string during restart");
+            }
         }
-    }
-    else
-    {
-        if (!runScriptFromFile())
+        else
         {
-            Serial.println("Failed to rerun script from file during restart");
+            if (!runScriptFromFile())
+            {
+                Serial.println("Failed to rerun script from file during restart");
+            }
         }
     }
 }

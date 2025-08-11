@@ -38,7 +38,7 @@ public:
     void loop();
     void reportError();
 
-    void restart();
+    void restart(bool rerun = false);
 
     lua_State *getLuaState() { return L; }
     void commandLine();
