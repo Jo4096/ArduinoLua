@@ -10,7 +10,7 @@ void setup() {
 
     if(!LittleFS.begin())
     {
-        while(1) {Serial.println("Tamos lixados\n"); delay(1000);}
+        while(1) {Serial.println("Erro ao iniciar LittleFS\n"); delay(1000);}
     }
 
     lua.addLib("arduino", luaopen_arduino);
