@@ -740,4 +740,48 @@
 ** without modifying the main part of the file.
 */
 
+
+
+/* ===== MCU-OPT START ===== */
+
+/* 1) Fixar tipos numéricos 32-bit + float (já temos LUA_32BITS, reforçar tipos) */
+#undef LUA_INT_TYPE
+#undef LUA_FLOAT_TYPE
+#define LUA_INT_TYPE   LUA_INT_INT        /* int de 32-bit */
+#define LUA_FLOAT_TYPE LUA_FLOAT_FLOAT    /* float de 32-bit */
+
+/* 2) Paths vazios (sem require por FS) */
+#undef LUA_PATH_DEFAULT
+#undef LUA_CPATH_DEFAULT
+#define LUA_PATH_DEFAULT  ""
+#define LUA_CPATH_DEFAULT ""
+
+/* 3) Sem dynamic loading / SO specifics */
+#undef LUA_USE_WINDOWS
+#undef LUA_USE_LINUX
+#undef LUA_USE_MACOSX
+#undef LUA_USE_IOS
+#undef LUA_DL_DLL
+#undef LUA_USE_DLOPEN
+
+/* 4) Buffer auxiliar menor */
+#undef LUAL_BUFFERSIZE
+#define LUAL_BUFFERSIZE 256   /* 256 ou 512 conforme o uso */
+
+/* 5) Sem extra space no lua_State */
+#undef LUA_EXTRASPACE
+#define LUA_EXTRASPACE 0
+
+/* 6) Tamanho menor para IDs de origem */
+#undef LUA_IDSIZE
+#define LUA_IDSIZE 40
+
+/* 7) Evitar coerções automáticas (opcional, mas bom para MCU) */
+#define LUA_NOCVTN2S
+#define LUA_NOCVTS2N
+
+/* ===== MCU-OPT END ===== */
+
+
+
 #endif
