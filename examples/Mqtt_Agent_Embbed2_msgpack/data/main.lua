@@ -31,7 +31,6 @@ function pong(from, topic, payload)
     print("[CMD] 'pong' recebido de "..sender_id);
 end
 
-mqtt.config(ssid, password, mqttserver, mqttuser, mqttpass, deviceID)
 mqtt.addSubscriptionTopic("devices/all/data");
 mqtt.addSubscriptionTopic("devices/esp32_quarto/cmd");
 mqtt.registerCommand("ligar_luz", ligar_luz)
