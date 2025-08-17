@@ -40,7 +40,7 @@
 // para poupar espaço tirei funções inuteis em microcontroladores
 static const luaL_Reg loadedlibs[] = {
     {LUA_GNAME, luaopen_base},
-    {LUA_LOADLIBNAME, luaopen_package},
+    //{LUA_LOADLIBNAME, luaopen_package}, //removida, porque removi os paths
     {LUA_COLIBNAME, luaopen_coroutine},
     {LUA_TABLIBNAME, luaopen_table},
     //{LUA_IOLIBNAME, luaopen_io},     // removida
