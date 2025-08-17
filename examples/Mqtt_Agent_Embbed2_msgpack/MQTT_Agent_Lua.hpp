@@ -4,6 +4,7 @@
 #include "Arduino.h"
 #include "MQTT_Agent.hpp"
 #include "ArduinoLua.hpp"
+#include "lua.hpp"
 
 void jsonToLuaTable(lua_State* L, JsonDocument& doc);
 
@@ -21,6 +22,10 @@ static int l_mqtt_removeCommand(lua_State *L);
 static int l_mqtt_getDeviceId(lua_State *L);
 static int l_mqtt_getCommands(lua_State *L);
 static int l_mqtt_getKnownDevices(lua_State *L);
+
+static int l_mqtt_fileloop(lua_State *L);
+static int l_mqtt_transfer_file(lua_State *L);
+
 
 extern "C" int luaopen_MQTT_Agent(lua_State *L);
 

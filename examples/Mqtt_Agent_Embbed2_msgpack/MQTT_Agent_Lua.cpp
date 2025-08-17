@@ -80,20 +80,31 @@ static int l_mqtt_config(lua_State *L) {
     const char *deviceId = luaL_checkstring(L, 6);
     int port = luaL_optinteger(L, 7, 1883);
     int pingPeriod = luaL_optinteger(L, 8, 30000);
+    int size = luaL_optinteger(L, 9, 1024);
 
     Agent.config(ssid, password, mqttServer, mqttUsername, mqttPassword, deviceId, port, pingPeriod);
+    Agent.setBufferSize(size);
     return 0;
 }
 
 static int l_mqtt_begin(lua_State *L) {
     bool enable = luaL_opt(L, lua_toboolean, 1, true);
-    bool correct = Agent.begin(enable);
+    bool enable2 = luaL_opt(L, lua_toboolean, 2, true);
+    bool correct = Agent.begin(enable, enable2);
     lua_pushboolean(L, correct);
     return 1;
 }
 
 static int l_mqtt_loop(lua_State *L) {
+    bool enable = luaL_opt(L, lua_toboolean, 1, true);
     Agent.loop();
+    if (enable) {
+        const char* filename = luaL_optstring(L, 2, "");
+        bool overwrite = lua_isnoneornil(L, 3) ? true : lua_toboolean(L, 3);
+        String result = Agent.fileLoop(LittleFS, filename, overwrite);
+        lua_pushstring(L, result.c_str());
+        return 1;
+    }
     return 0;
 }
 
@@ -201,7 +212,7 @@ static int l_mqtt_removeCommand(lua_State *L) {
 
 static int l_mqtt_getDeviceId(lua_State *L)
 {
-    lua_pushstring(L, Agent.getDeviceId());
+    lua_pushstring(L, Agent.getDeviceId().c_str());
     return 1;
 }
 
@@ -230,6 +241,32 @@ static int l_mqtt_getKnownDevices(lua_State *L)
     return 1;
 }
 
+static int l_mqtt_transfer_file(lua_State *L)
+{
+    String destination_id = String(luaL_checkstring(L, 1));
+    String filename = String(luaL_checkstring(L, 2));
+
+    luaL_checktype(L, 3, LUA_TTABLE);  // garante que o 3º arg é tabela
+    size_t len = lua_rawlen(L, 3);
+
+    std::vector<uint8_t> rawdata;
+    rawdata.reserve(len);
+
+    for (size_t i = 1; i <= len; i++)  // Lua é 1-based
+    {
+        lua_rawgeti(L, 3, i);                  // empilha tabela[ i ]
+        int value = luaL_checkinteger(L, -1);  // lê inteiro
+        lua_pop(L, 1);                         // remove da stack
+        rawdata.push_back((uint8_t)value);
+    }
+
+    int chunkSize = luaL_optinteger(L, 4, 512);
+
+    Agent.transfer_file(destination_id, filename, rawdata, chunkSize);
+
+    return 0;
+}
+
 
 static const luaL_Reg mqtt_lib[] = {
     {"config", l_mqtt_config},
@@ -246,6 +283,7 @@ static const luaL_Reg mqtt_lib[] = {
     {"getDeviceId", l_mqtt_getDeviceId},
     {"getCommands", l_mqtt_getCommands},
     {"getKnownDevices", l_mqtt_getKnownDevices},
+    {"transfer_file",l_mqtt_transfer_file},
     {NULL, NULL}
 };
 
